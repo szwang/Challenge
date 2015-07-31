@@ -1,24 +1,20 @@
 angular.module('challengeApp', [
+  'challengeApp.detail',
   'challengeApp.challenge',
   'challengeApp.createChallenge',
+  'challengeApp.allChallenges',
   'challengeApp.userChallenge',
   'challengeApp.services',
   'challengeApp.dashboard',
+  'challengeApp.ranking',
+  'challengeApp.profile',
   'challengeApp.auth',
   'ui.router'
 ])
 
 .config(function($stateProvider, $urlRouterProvider) {
-  // TODO: reroute to login/landing page
   $urlRouterProvider.otherwise('/auth');
   $stateProvider
-    // .state('signout', {
-    //   url: '/signout',
-    //   controller: function($scope, $state) {
-    //     $scope.logout();
-    //     $state.go('signin');
-    //   }
-    // })
     .state('auth', {
       url: '/auth',
       templateUrl: 'html/auth.html',
@@ -27,7 +23,10 @@ angular.module('challengeApp', [
     .state('challenge_create', {
       url: '/challenge/create',
       templateUrl: './html/create.html',
-      controller: 'CreateChallengeController'
+      controller: 'CreateChallengeController',
+      resolve: {
+        authorize: isLoggedIn
+      }
     })
     .state('challenge_view', {
       url: '/challenge/:id',
@@ -69,20 +68,42 @@ angular.module('challengeApp', [
         authorize: isLoggedIn
       }
     })
-    .state('dashboard.list', {
-      url: '/dashboard/list',
-      templateUrl: './html/allchallenges.html',
+    .state('dashboard.profile', {
+      url: '/profile',
+      templateUrl: './html/profile.html',
+      controller: 'ProfileController',
+      resolve: {
+        authorize: isLoggedIn
+      }
     })
     .state('dashboard', {
-      url: '/dashboard',
+      url: '/dashboard/:username',
       templateUrl: './html/dashboard.html',
-      controller: 'dashboardController'
+      controller: 'dashboardController',
+      resolve: {
+        authorize: isLoggedIn
+      }
     })
     .state('user', {
       url: '/user',
       templateUrl: './html/user.html',
-      controller: 'UserChallengesController'
+      controller: 'UserChallengesController',
+      resolve: {
+        authorize: isLoggedIn
+      }
     });
+
+  function isLoggedIn($q, $timeout, $state, $window) {
+    if ($window.sessionStorage.loggedIn === 'true') {
+      console.log('Login succeed!');
+      return $q.when();
+    } else {
+      $timeout(function() {
+        $state.go('auth');
+      });
+      return $q.reject();
+    }
+  }
 
 }).controller('ChallengeAppController', function($scope, $state, Auth) {
   $scope.user = {};
@@ -92,22 +113,6 @@ angular.module('challengeApp', [
     $scope.user.password = pw;
     Auth.getUserInfo(username, pw);
   }
-
-  // $scope.setCurrentUser = function() {
-  //   Auth.getUserInfo().then(function(user) {
-  //     $scope.user = user;
-  //   }, function() {
-  //     $state.go('signin');
-  //   });
-  // };
-
-  // $scope.logout = function() {
-  //   Auth.logout().then(function() {
-  //     $scope.user = null;
-  //   });
-  // };
-
-  // $scope.setCurrentUser();
 }).filter('challengeFilter', function() {
   return function(input, accepted, started, complete, user) {
     user = (user !== undefined) ? parseInt(user) : undefined;
@@ -123,7 +128,6 @@ angular.module('challengeApp', [
           return (participant.accepted === accepted && participant.id === user);
         });
       }
-
       return (
         ((challenge.started === started) || started === null) && ((challenge.complete === complete) || complete === null) && has_accepted
       );

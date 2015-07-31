@@ -1,79 +1,91 @@
 var express = require('express');
 var router = express.Router();
-var models = require('../models');
-var Promise = require('bluebird');
-var bcrypt = require('bcrypt');
-var compare = Promise.promisify(bcrypt.compare);
-// require crypto?
+var crontab = require('node-crontab');
+var Sequelize = require('sequelize');
+var models = require('../models/index.js');
 
-var tempAuthInfo = {};
-
-// routing to auth
-router.post('/signup', function(req, res) {
-	var username = req.body.username;
-	tempAuthInfo[username] = {};
-	bcrypt.genSalt(10, function(err, salt) {
-	  if(err) {
-	  	console.log(err);
-	  	return;
-	  }
-	  bcrypt.hash(req.body.password, salt, function(err, hash) {
-	    tempAuthInfo[username].password = hash;
-	  })
-	})
-    res.send("good");
+/* GET home page. */
+router.get('/', function(req, res, next) {
+  res.sendFile('public/index.html', {'root':__dirname + '/../'});
 });
 
-router.post('/login', function(req, res) {
-  var username = req.body.username;
-  var password = req.body.password;
-  var hashed = tempAuthInfo[username].password;
-  return compare(password, hashed)
-  .then(function(data) {
-  	console.log('bcrypt', data);
-  	res.send(data);
-  })
-});
+module.exports = router;
 
-// router.get('/logout', function(req, res) {
-//   req.logout();
-//   if (req.xhr) {
-//     res.json({'success': true});
-//   } else {
-//     res.redirect('/');
-//   }
-// });
+/* Back ground job to update winners. */
 
-// router.get('/login', function(req, res, next) {
-//   if (process.env.TESTING) {
-//     req.login({id:1}, function() {
-//       res.send();
-//     });
-//     return;
-//   }
-//   next();
-// }, passport.authenticate('facebook', {'scope': ['email', 'user_friends']}));
+crontab.scheduleJob('*/1 * * * *', updateWinner);
 
-// router.get('/facebook/callback', passport.authenticate('facebook'), function(req, res) {
-//   var query = {
-//     'include': {
-//       'model': models.User,
-//       'as': 'participants',
-//       'where': {
-//         'id': req.user.id
-//       }
-//     }
-//   };
+function updateWinner() {
+  console.log('updateWinner!', Date.now());
+  models.Challenge.findAll({
+    order: [['createdAt', 'DESC']], // must pass an array of tuples
+    where: {
+      winner: null,
+      date_completed: {
+        $lt: Sequelize.literal('CURRENT_TIMESTAMP') // I have no idea why Sequelize.NOW() doew not work...
+      }
+    },
+    include: [{
+      model: models.User,
+      as: 'participants'
+    }]
+  }).then(function (challenges) {
+    console.log('GOT IT!', challenges);
+    // set winner to each challenges
+    challenges.forEach(setWinner);
+  });
+}
 
-//   models.Challenge.count(query).then(function(count) {
-//     if (count > 0) {
-//       res.redirect('/#/user');
-//     } else {
-//       res.redirect('/#/challenges');
-//     }
-//   });
-// });
+function setWinner(challenge) {
+  var started = 'Completed';
+  var newWinner = 0;
+  var tie = false;
+  var max = 0;
 
-module.exports = {
-  'router': router
-};
+  // compare each users upvote to decide the winner
+  challenge.get('participants').forEach(function (participant) {
+    if (max === participant.usersChallenges.upvote){
+      newWinner = 0;
+      tie = true;
+    }
+    if (max < participant.usersChallenges.upvote){
+      newWinner = participant.id;
+      max = participant.upvote;
+      tie = false;
+    }
+  });
+
+  if (tie) {
+    started = 'Tie';
+    newWinner = -1;
+  }
+  // update the winner of the challenge
+  models.Challenge.update({
+    winner: newWinner,
+    started: started,
+    completed: true
+  }, {
+    where: {
+      id: challenge.get('id')
+    }
+  });
+
+  if (tie) {
+    challenge.get('participants').forEach(function (participant) {
+      giveCoin(participant.get('id'), challenge.get('wager'));
+    });
+    return;
+  }
+  // update the coin fo the winner
+  giveCoin(newWinner, challenge.get('wager') * challenge.get('participants').length);
+}
+
+function giveCoin(user_id, coin) {
+  models.User.update({
+    coin: Sequelize.literal('coin +' + coin)
+  }, {
+    where: {
+      id: user_id
+    }
+  });
+}
