@@ -14,7 +14,7 @@ var api_request = request.defaults({
   'baseUrl': 'http://localhost:3030' 
 });
 
-describe('API Integration', function() {
+describe('API Integration:', function() {
   before(function(done) {
     var server = http.createServer(app);
     app.set('port', 3030);
@@ -28,23 +28,12 @@ describe('API Integration', function() {
     })
   });
 
-  describe('database functions', function() {
-    console.log('HI');
+  describe('challenge functions', function() {
     before(function(done) {
-      models.orm.drop().then(function() {
-        console.log('DROP WORKING')
-        return models.orm.sync();
-      }).then(function() {
-        console.log('THEN AFTER DROP')
-        return models.User.bulkCreate([{
-          username: 'suz',
-          coin: 400
-        }, {
-          username: 'shu',
-          coin: 2000
-        }]);
-      }).then(function() {
-        console.log('TheN CREATE CHALLENGE')
+      return models.User.bulkCreate([{
+        username:'suz',
+        coin: 400
+      }]).then(function() {
         return models.Challenge.create({
           title: 'eat chocolate',
           message: 'have 2 squares a day',
@@ -53,97 +42,107 @@ describe('API Integration', function() {
           winner: 'shu',
           complete: true,
           started: 'started',
-          total_wager: 400
-        })
-      }).then(function() {
+          total_wager: 400,
+          date_started: '5/11/1995'
+        }).then(function() {
         done();
+        })
       })
-    });
+    })
 
     after(function(done) {
-      models.orm.drop().then(function() {
-        done();
-      })
-    });
+      models.orm.sync({force: true})
+        .then(function() {
+          done();
+        })
+    })
 
     it('should retrieve values from users table', function(done) {
-      console.log('before all=====**********')
       var uri = 'http://localhost:3030/api/1/allUsers';
       request({'uri': uri, 'json': true}, function(err, res, body) {
-        console.log('========= user table =========', body);
         expect(body).to.be.an('array');
         expect(body[0].username).to.be.eql('suz');
         expect(body[0]).to.contain.all.keys([
           'username', 'coin', 'id', 'profile_image'
-          // 'title', 'message','wager', 'creator', 
-          // 'winner', 'complete', 'started', 'total_wager'
         ])
         done();
       })
     }); 
-  });
 
-  //   it('should find created challenges', function(done) {
-  //     var uri = 'http://localhost:3030/api/1/challenge/public';
-  //     request({'uri':uri, 'json': true}, function(err, res, body) {
-  //       console.log('======= challenge table ========', body);
-  //       expect(body).to.be.an('array');
-  //       expect(body[0]).to.be.an('object');
-  //       expect(body[0].title).to.be.eql('eat chocolate');
-  //       expect(body[0].wager).to.be.eql(200);
-  //       expect(body[0].complete).to.be.eql(true);
-  //       done();
-  //     })
-  //   });
 
-  //   it('should correctly send post request to get login user info', function(done) {
-  //     var uri = 'http://localhost:3030/api/1/login_user_info';
-  //     var res;
-  //     request({
-  //       uri: uri, 
-  //       json: true, 
-  //       method: 'POST',
-  //       body: {username: 'suz'}
-  //     }, function(err, res, body) {
-  //       console.log('====== POST loginuserinfo body ======', body);
-  //       expect(body).to.be.an('object');
-  //       expect(body).to.contain.all.keys([
-  //         'username', 'password', 'image', 'coin'
-  //       ])
-  //       expect(body.coin).to.be.eql(400);
-  //       done();
-  //     })
-  //   })
+    it('should find created challenges', function(done) {
+      var uri = 'http://localhost:3030/api/1/challenge/public';
+      request({'uri':uri, 'json': true}, function(err, res, body) {
+        expect(body).to.be.an('array');
+        expect(body[0]).to.be.an('object');
+        expect(body[0].title).to.be.eql('eat chocolate');
+        expect(body[0].wager).to.be.eql(200);
+        done();
+      })
+    });
 
-  //   it('should not allow signup if username already exists', function(done) {
+    it('should correctly send post request to get login user info', function(done) {
+      var uri = 'http://localhost:3030/api/1/login_user_info';
+      var res;
+      request({
+        uri: uri, 
+        json: true, 
+        method: 'POST',
+        body: {username: 'suz'}
+      }, function(err, res, body) {
+        expect(body).to.be.an('object');
+        expect(body).to.contain.all.keys([
+          'username', 'password', 'image', 'coin'
+        ])
+        expect(body.coin).to.be.eql(400);
+        done();
+      })
+    })
+  })
 
-  //     var uri = 'http://localhost:3030/auth/signup';
-  //     request({
-  //       uri: uri,
-  //       json: true,
-  //       method: 'POST',
-  //       body: {username: 'suz'}
-  //     }, function(err, res, body) {
-  //       expect(body).to.be.eql('username already exists');
-  //       done();
-  //     })
-  //   })
-    
-  //   it('should allow for successful signups', function(done) {
-  //     var uri = 'http://localhost:3030/auth/signup';
-  //     request({
-  //       uri: uri,
-  //       json: true,
-  //       method: 'POST',
-  //       body: {username: 'dave'}
-  //     }, function(err, res, body) {
-  //       console.log('========= successful signup ========', body);
-  //       expect(body).to.be.eql('done');
-  //       done();
-  //     })
-  //   })
+  describe('auth routes', function() {
+    before(function(done) {
+      return models.User.bulkCreate([{
+        username:'suz',
+        coin: 400
+      }]).then(function() {
+        done();
+      })
+    })
 
-  // });
+    after(function(done) {
+      models.orm.sync({force: true})
+        .then(function() {
+          done();
+        })
+    })
+
+    it('should not allow signup if username already exists', function(done) {
+      var uri = 'http://localhost:3030/auth/signup';
+      request({
+        uri: uri,
+        json: true,
+        method: 'POST',
+        body: {username: 'suz'}
+      }, function(err, res, body) {
+        expect(body).to.be.eql('username already exists');
+        done();
+      })
+    })
+
+    it('should allow signups', function(done) {
+      var uri = 'http://localhost:3030/auth/signup';
+      request({
+        uri: uri,
+        json: true,
+        method: 'POST',
+        body: {username: 'david'}
+      }, function(err, res, body) {
+        expect(body).to.be.eql('done');
+        done();
+      })
+    })
+  })
 });
     // })
 
