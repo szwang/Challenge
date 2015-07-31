@@ -32,7 +32,42 @@ angular.module('challengeApp', [
     .state('challenge_view', {
       url: '/challenge/:id',
       templateUrl: './html/challenge.html',
-      controller: 'ChallengeController'
+      controller: 'ChallengeController',
+      resolve: {
+        authorize: isLoggedIn
+      }
+    })
+    .state('dashboard.detail', {
+      url: '/challenge/:itemId',
+      templateUrl: './html/detail.html',
+      controller: 'DetailController',
+      resolve: {
+        authorize: isLoggedIn
+      }
+    })
+    .state('dashboard.ranking', {
+      url: '/ranking',
+      templateUrl: './html/ranking.html',
+      controller: 'RankingController',
+      resolve: {
+        authorize: isLoggedIn
+      }
+    })
+    .state('dashboard.allChallenges', {
+      url: '/allChallenges',
+      templateUrl: './html/allChallenges.html',
+      controller: 'AllChallengesController',
+      resolve: {
+        authorize: isLoggedIn
+      }
+    })
+    .state('dashboard.create', {
+      url: '/create',
+      templateUrl: './html/create.html',
+      controller: 'CreateChallengeController',
+      resolve: {
+        authorize: isLoggedIn
+      }
     })
     .state('dashboard.list', {
       url: '/dashboard/list',
